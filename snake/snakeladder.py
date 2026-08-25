@@ -233,6 +233,148 @@ board_canvas = tk.Canvas(
 
 board_canvas.pack(pady=10)
 
+# ---------------------------------------------------------
+# GAME BOARD FUNCTIONS
+# ---------------------------------------------------------
+
+# this function will find the x and y coordinates
+# of a particular position on the board
+def get_coordinates(position):
+
+    # size of each box
+    box_size = 50
+
+    # convert the position into a zero-based number
+    zero_position = position - 1
+
+    # find which row the position belongs to
+    row = zero_position // 10
+
+    # find which column the position belongs to
+    column = zero_position % 10
+
+    # every alternate row moves in the opposite direction
+    # to create the traditional Snake and Ladder board
+    if row % 2 != 0:
+        column = 9 - column
+
+    # calculate the center of the box
+    x = column * box_size + box_size / 2
+    y = (9 - row) * box_size + box_size / 2
+
+    return x, y
+
+
+# this function will create the 10 x 10 board
+# and place the numbers from 1 to 100 inside the boxes
+def draw_board():
+
+    # size of each box
+    box_size = 50
+
+    # go through all 100 positions
+    for position in range(1, 101):
+
+        zero_position = position - 1
+
+        row = zero_position // 10
+        column = zero_position % 10
+
+        if row % 2 != 0:
+            column = 9 - column
+
+        x1 = column * box_size
+        y1 = (9 - row) * box_size
+
+        x2 = x1 + box_size
+        y2 = y1 + box_size
+
+        board_canvas.create_rectangle(
+            x1,
+            y1,
+            x2,
+            y2,
+            outline="black"
+        )
+
+        board_canvas.create_text(
+            x1 + box_size / 2,
+            y1 + box_size / 2,
+            text=str(position),
+            font=("Arial", 10)
+        )
+
+
+# this function will draw all the snakes on the board
+def draw_snakes():
+
+    snakes = {
+        16: 6,
+        43: 26,
+        49: 11,
+        56: 34,
+        62: 19,
+        64: 6,
+        87: 24,
+        93: 43,
+        95: 55,
+        98: 48
+    }
+
+    # go through every snake
+    for start, end in snakes.items():
+
+        # get the coordinates of the snake's starting position
+        start_x, start_y = get_coordinates(start)
+
+        # get the coordinates of the snake's ending position
+        end_x, end_y = get_coordinates(end)
+
+        # draw a line between the two positions
+        board_canvas.create_line(
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            fill="red",
+            width=8
+        )
+
+
+# this function will draw all the ladders on the board
+def draw_ladders():
+
+    ladders = {
+        1: 38,
+        4: 14,
+        9: 31,
+        21: 42,
+        28: 84,
+        36: 44,
+        51: 67,
+        71: 91,
+        80: 100
+    }
+
+    # go through every ladder
+    for start, end in ladders.items():
+
+        # get the coordinates of the ladder's starting position
+        start_x, start_y = get_coordinates(start)
+
+        # get the coordinates of the ladder's ending position
+        end_x, end_y = get_coordinates(end)
+
+        # draw a line between the two positions
+        board_canvas.create_line(
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            fill="green",
+            width=8
+        )
+
 # this frame will contain the position of every player
 players_position_frame = tk.Frame(game_frame)
 players_position_frame.pack(pady=10)
@@ -312,6 +454,39 @@ def draw_board():
             text=str(position),
             font=("Arial", 10)
         )
+
+# ---------------------------------------------------------
+# GET BOARD COORDINATES FUNCTION
+# ---------------------------------------------------------
+
+# this function will find the x and y coordinates
+# of a particular position on the board
+
+def get_coordinates(position):
+
+    # size of each box
+    box_size = 50
+
+    # convert the position into a zero-based number
+    zero_position = position - 1
+
+    # find which row the position belongs to
+    row = zero_position // 10
+
+    # find which column the position belongs to
+    column = zero_position % 10
+
+    # every alternate row moves in the opposite direction
+    # to create the traditional Snake and Ladder board
+    if row % 2 != 0:
+        column = 9 - column
+
+    # calculate the center of the box
+    x = column * box_size + box_size / 2
+    y = (9 - row) * box_size + box_size / 2
+
+    return x, y
+
 
 # draw the board when the game starts
 draw_board()
@@ -481,6 +656,15 @@ roll_button = tk.Button(
 )
 
 roll_button.pack(pady=20)
+
+# draw the board
+draw_board()
+
+# draw the snakes
+draw_snakes()
+
+# draw the ladders
+draw_ladders()
 
 
 # start the Tkinter event loop
