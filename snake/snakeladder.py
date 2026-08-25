@@ -5,7 +5,7 @@ import random
 root = tk.Tk()
 
 root.title("Snake and Ladder Game")
-root.geometry("600x600")
+root.geometry("800x800")
 
 
 # create the list of colors that will be assigned to the players
@@ -313,6 +313,8 @@ def draw_board():
             font=("Arial", 10)
         )
 
+# draw the board when the game starts
+draw_board()
 
 # ---------------------------------------------------------
 # ROLL DICE FUNCTION
