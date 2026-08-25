@@ -8,8 +8,6 @@ root.title("Snake and Ladder Game")
 root.geometry("600x600")
 
 
-
-
 # create the list of colors that will be assigned to the players
 colors = ["red", "blue", "green", "yellow"]
 
@@ -19,8 +17,12 @@ name_entries = []
 # create an empty list where we will store the player information
 players = []
 
+# create an empty list where we will store the position labels of every player
+position_labels = []
+
 # initialize the current player
 current_player = 0
+
 
 # ---------------------------------------------------------
 # START FRAME
@@ -28,7 +30,6 @@ current_player = 0
 
 # create a frame for the starting part of the game
 start_frame = tk.Frame(root)
-
 start_frame.pack(pady=20)
 
 
@@ -52,7 +53,6 @@ label.pack(pady=10)
 
 # here we create the box for the players to enter the number of players
 players_entry = tk.Entry(start_frame)
-
 players_entry.pack(pady=10)
 
 
@@ -86,11 +86,16 @@ game_frame = tk.Frame(root)
 def save_players():
 
     global players
+    global current_player
 
     # clear the players list before adding the player information
     players = []
 
+    # clear the position labels list
+    position_labels.clear()
 
+    # reset the current player
+    current_player = 0
 
     # go through every name entry box and get the name entered by the player
     for i, entry in enumerate(name_entries):
@@ -107,10 +112,28 @@ def save_players():
 
     print(players)
 
-      # show the first player's name because they will get the first turn
+
+    # create a position label for every player
+    for player in players:
+
+        player_position_label = tk.Label(
+            players_position_frame,
+            text=f"{player['name']}: Position 0",
+            font=("Arial", 14),
+            fg=player["color"]
+        )
+
+        player_position_label.pack(pady=3)
+
+        # store the label so we can update it later
+        position_labels.append(player_position_label)
+
+
+    # show the first player's name because they will get the first turn
     current_player_label.config(
         text=f"Current Player: {players[0]['name']}"
     )
+
 
     # after the players have been created,
     # hide the name frame because we no longer need it
@@ -129,6 +152,7 @@ def start_game():
 
     players_number = int(players_entry.get())
 
+
     # check if the number of players is between 1 and 4
     if players_number < 1 or players_number > 4:
 
@@ -141,11 +165,13 @@ def start_game():
 
         return
 
+
     # hide the starting frame because we now want the players to enter their names
     start_frame.pack_forget()
 
     # show the name frame
     name_frame.pack(pady=20)
+
 
     # create a name entry box for every player
     for i in range(players_number):
@@ -157,13 +183,15 @@ def start_game():
 
         player_label.pack()
 
+
         # create the box where the player will enter their name
         name_entry = tk.Entry(name_frame)
-
         name_entry.pack(pady=5)
+
 
         # store the entry box in the name_entries list
         name_entries.append(name_entry)
+
 
     # create the Continue button after all the name entry boxes
     # have been created
@@ -195,23 +223,30 @@ start_button.pack(pady=10)
 # GAME UI
 # ---------------------------------------------------------
 
-# this is the label that will show the current position of the player
-position_label = tk.Label(
+# this canvas will contain the 10 x 10 Snake and Ladder board
+board_canvas = tk.Canvas(
     game_frame,
-    text="Position: 0",
-    font=("Arial", 16)
+    width=500,
+    height=500,
+    bg="white"
 )
 
-position_label.pack(pady=10)
+board_canvas.pack(pady=10)
+
+# this frame will contain the position of every player
+players_position_frame = tk.Frame(game_frame)
+players_position_frame.pack(pady=10)
+
 
 # this is the label that will show whose turn it is
 current_player_label = tk.Label(
     game_frame,
-    text = "Current Player: -",
-    font = ("Arial", 16)
+    text="Current Player: -",
+    font=("Arial", 16)
 )
 
 current_player_label.pack(pady=10)
+
 
 # this is the label that will show the value of the dice rolled
 dice_label = tk.Label(
@@ -223,23 +258,83 @@ dice_label = tk.Label(
 dice_label.pack(pady=10)
 
 # ---------------------------------------------------------
+# DRAW BOARD FUNCTION
+# ---------------------------------------------------------
+
+# this function will create the 10 x 10 board
+# and place the numbers from 1 to 100 inside the boxes
+
+def draw_board():
+
+    # size of each box
+    box_size = 50
+
+    # go through all 100 positions
+    for position in range(1, 101):
+
+        # convert the position into a zero-based number
+        zero_position = position - 1
+
+        # find which row the position belongs to
+        row = zero_position // 10
+
+        # find which column the position belongs to
+        column = zero_position % 10
+
+        # every alternate row moves in the opposite direction
+        # to create the traditional Snake and Ladder board
+        if row % 2 != 0:
+            column = 9 - column
+
+        # calculate the x position of the box
+        x1 = column * box_size
+
+        # calculate the y position of the box
+        y1 = (9 - row) * box_size
+
+        # calculate the other corner of the box
+        x2 = x1 + box_size
+        y2 = y1 + box_size
+
+        # create the box
+        board_canvas.create_rectangle(
+            x1,
+            y1,
+            x2,
+            y2,
+            outline="black"
+        )
+
+        # put the position number inside the box
+        board_canvas.create_text(
+            x1 + box_size / 2,
+            y1 + box_size / 2,
+            text=str(position),
+            font=("Arial", 10)
+        )
+
+
+# ---------------------------------------------------------
 # ROLL DICE FUNCTION
 # ---------------------------------------------------------
 
 # this is the function that will be called when the Roll Dice button is pressed
-
 def roll_dice():
 
     global current_player
 
+
     # get the player whose turn it currently is
     player = players[current_player]
+
 
     # the dice value is generated randomly between 1 and 6
     dice_value = random.randint(1, 6)
 
+
     # get the current position of the player
     current_position = player["position"]
+
 
     # if the player is at position 0 and rolls a number other than 6,
     # they cannot start the game
@@ -249,6 +344,7 @@ def roll_dice():
             text=f"{player['name']} rolled {dice_value}. You need to roll a 6 to start."
         )
 
+
         # move to the next player
         current_player = (current_player + 1) % len(players)
 
@@ -257,21 +353,25 @@ def roll_dice():
         )
 
         return
+
 
     # show the dice value
     dice_label.config(
         text=f"{player['name']} rolled: {dice_value}"
     )
 
+
     # calculate the new position
     new_position = current_position + dice_value
+
 
     # the player cannot move beyond position 100
     if new_position > 100:
 
-        position_label.config(
-            text=f"{player['name']} stays at position {current_position}"
+        position_labels[current_player].config(
+            text=f"{player['name']}: Position {current_position}"
         )
+
 
         # move to the next player
         current_player = (current_player + 1) % len(players)
@@ -282,8 +382,10 @@ def roll_dice():
 
         return
 
+
     # update the player's position
     player["position"] = new_position
+
 
     # create the snakes
     snakes = {
@@ -299,6 +401,7 @@ def roll_dice():
         98: 48
     }
 
+
     # create the ladders
     ladders = {
         1: 38,
@@ -312,34 +415,38 @@ def roll_dice():
         80: 100
     }
 
+
     # check if the player has landed on a snake
     if player["position"] in snakes:
 
         player["position"] = snakes[player["position"]]
 
-        position_label.config(
-            text=f"{player['name']} is at position {player['position']} (Snake!)"
+        position_labels[current_player].config(
+            text=f"{player['name']}: Position {player['position']} (Snake!)"
         )
+
 
     # check if the player has landed on a ladder
     elif player["position"] in ladders:
 
         player["position"] = ladders[player["position"]]
 
-        position_label.config(
-            text=f"{player['name']} is at position {player['position']} (Ladder!)"
+        position_labels[current_player].config(
+            text=f"{player['name']}: Position {player['position']} (Ladder!)"
         )
+
 
     else:
 
-        position_label.config(
-            text=f"{player['name']} is at position {player['position']}"
+        position_labels[current_player].config(
+            text=f"{player['name']}: Position {player['position']}"
         )
+
 
     # check if the player has reached position 100
     if player["position"] == 100:
 
-        position_label.config(
+        position_labels[current_player].config(
             text=f"🎉 {player['name']} won the game! 🎉"
         )
 
@@ -349,13 +456,16 @@ def roll_dice():
 
         return
 
+
     # move to the next player
     current_player = (current_player + 1) % len(players)
+
 
     # update the current player label
     current_player_label.config(
         text=f"Current Player: {players[current_player]['name']}"
     )
+
 
 # ---------------------------------------------------------
 # ROLL DICE BUTTON
