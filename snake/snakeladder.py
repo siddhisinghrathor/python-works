@@ -8,8 +8,7 @@ root.title("Snake and Ladder Game")
 root.geometry("600x600")
 
 
-# initialize player position
-player_position = 0
+
 
 # create the list of colors that will be assigned to the players
 colors = ["red", "blue", "green", "yellow"]
@@ -108,6 +107,11 @@ def save_players():
 
     print(players)
 
+      # show the first player's name because they will get the first turn
+    current_player_label.config(
+        text=f"Current Player: {players[0]['name']}"
+    )
+
     # after the players have been created,
     # hide the name frame because we no longer need it
     name_frame.pack_forget()
@@ -200,6 +204,14 @@ position_label = tk.Label(
 
 position_label.pack(pady=10)
 
+# this is the label that will show whose turn it is
+current_player_label = tk.Label(
+    game_frame,
+    text = "Current Player: -",
+    font = ("Arial", 16)
+)
+
+current_player_label.pack(pady=10)
 
 # this is the label that will show the value of the dice rolled
 dice_label = tk.Label(
@@ -210,53 +222,70 @@ dice_label = tk.Label(
 
 dice_label.pack(pady=10)
 
-
 # ---------------------------------------------------------
 # ROLL DICE FUNCTION
 # ---------------------------------------------------------
 
 # this is the function that will be called when the Roll Dice button is pressed
+
 def roll_dice():
 
-    global player_position
+    global current_player
+
+    # get the player whose turn it currently is
+    player = players[current_player]
 
     # the dice value is generated randomly between 1 and 6
-    # and if the player is at position 0 and rolls a number other than 6,
-    # they cannot move forward
     dice_value = random.randint(1, 6)
 
-    if player_position == 0 and dice_value != 6:
+    # get the current position of the player
+    current_position = player["position"]
+
+    # if the player is at position 0 and rolls a number other than 6,
+    # they cannot start the game
+    if current_position == 0 and dice_value != 6:
 
         dice_label.config(
-            text=f"You rolled: {dice_value}. You need to roll a 6 to start."
+            text=f"{player['name']} rolled {dice_value}. You need to roll a 6 to start."
+        )
+
+        # move to the next player
+        current_player = (current_player + 1) % len(players)
+
+        current_player_label.config(
+            text=f"Current Player: {players[current_player]['name']}"
         )
 
         return
 
-    # the config method is used to change the text of the dice_label
-    # to show the value of the dice rolled
+    # show the dice value
     dice_label.config(
-        text=f"You rolled: {dice_value}"
+        text=f"{player['name']} rolled: {dice_value}"
     )
 
-    new_position = player_position + dice_value
+    # calculate the new position
+    new_position = current_position + dice_value
 
-    # the player cannot move beyond position 100,
-    # so if the new position is greater than 100,
-    # the player stays in the same position
+    # the player cannot move beyond position 100
     if new_position > 100:
 
-        new_position = player_position
-
         position_label.config(
-            text=f"Position: {new_position}"
+            text=f"{player['name']} stays at position {current_position}"
+        )
+
+        # move to the next player
+        current_player = (current_player + 1) % len(players)
+
+        current_player_label.config(
+            text=f"Current Player: {players[current_player]['name']}"
         )
 
         return
 
-    # the player_position is updated to the new position
-    player_position = new_position
+    # update the player's position
+    player["position"] = new_position
 
+    # create the snakes
     snakes = {
         16: 6,
         43: 26,
@@ -270,6 +299,7 @@ def roll_dice():
         98: 48
     }
 
+    # create the ladders
     ladders = {
         1: 38,
         4: 14,
@@ -282,42 +312,50 @@ def roll_dice():
         80: 100
     }
 
-    # check if the player has landed on a snake or a ladder
-    # and then update the player position accordingly
-    if player_position in snakes:
+    # check if the player has landed on a snake
+    if player["position"] in snakes:
 
-        player_position = snakes[player_position]
+        player["position"] = snakes[player["position"]]
 
         position_label.config(
-            text=f"Position: {player_position} (Snake!)"
+            text=f"{player['name']} is at position {player['position']} (Snake!)"
         )
 
-    elif player_position in ladders:
+    # check if the player has landed on a ladder
+    elif player["position"] in ladders:
 
-        player_position = ladders[player_position]
+        player["position"] = ladders[player["position"]]
 
         position_label.config(
-            text=f"Position: {player_position} (Ladder!)"
+            text=f"{player['name']} is at position {player['position']} (Ladder!)"
         )
 
     else:
 
         position_label.config(
-            text=f"Position: {player_position}"
+            text=f"{player['name']} is at position {player['position']}"
         )
 
-    # if the player has reached position 100,
-    # the game is won and the roll button is disabled
-    if player_position == 100:
+    # check if the player has reached position 100
+    if player["position"] == 100:
 
         position_label.config(
-            text="Congratulations! You reached 100 and won the game!"
+            text=f"🎉 {player['name']} won the game! 🎉"
         )
 
         roll_button.config(
             state=tk.DISABLED
         )
 
+        return
+
+    # move to the next player
+    current_player = (current_player + 1) % len(players)
+
+    # update the current player label
+    current_player_label.config(
+        text=f"Current Player: {players[current_player]['name']}"
+    )
 
 # ---------------------------------------------------------
 # ROLL DICE BUTTON
