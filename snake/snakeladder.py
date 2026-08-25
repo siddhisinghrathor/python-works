@@ -20,6 +20,8 @@ name_entries = []
 # create an empty list where we will store the player information
 players = []
 
+# initialize the current player
+current_player = 0
 
 # ---------------------------------------------------------
 # START FRAME
@@ -88,6 +90,8 @@ def save_players():
 
     # clear the players list before adding the player information
     players = []
+
+
 
     # go through every name entry box and get the name entered by the player
     for i, entry in enumerate(name_entries):
