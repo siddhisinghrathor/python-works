@@ -5,7 +5,9 @@ import random
 root = tk.Tk()
 
 root.title("Snake and Ladder Game")
-root.geometry("800x800")
+root.geometry("1000x750")
+
+root.configure(bg="#f5f1e8")
 
 
 # create the list of colors that will be assigned to the players
@@ -71,8 +73,16 @@ name_frame = tk.Frame(root)
 # GAME FRAME
 # ---------------------------------------------------------
 
+# ---------------------------------------------------------
+# GAME FRAME
+# ---------------------------------------------------------
+
 # create a frame where the actual game will be displayed
-game_frame = tk.Frame(root)
+
+game_frame = tk.Frame(
+    root,
+    bg="#f5f1e8"
+)
 
 # we are not packing the game frame yet because
 # the actual game should only appear after the players have entered their names
