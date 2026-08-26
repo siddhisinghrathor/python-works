@@ -155,13 +155,40 @@ continue_button_holder = tk.Frame(name_card, bg=BG_PANEL)
 
 
 def pick_color(index):
-    chosen = colorchooser.askcolor(
-        color=color_buttons[index]["value"],
-        title="Choose your token color"
-    )
-    if chosen[1]:
-        color_buttons[index]["value"] = chosen[1]
-        color_buttons[index]["swatch"].config(bg=chosen[1])
+    # Find which of the 4 default colors are currently selected by other players
+    selected_colors = [cb["value"] for idx, cb in enumerate(color_buttons) if idx != index]
+    
+    # Available colors are the ones in DEFAULT_COLORS that are not in selected_colors
+    available_colors = [c for c in DEFAULT_COLORS if c not in selected_colors]
+    
+    if not available_colors:
+        return
+        
+    menu = tk.Menu(root, tearoff=0, bg=BG_PANEL, fg=TEXT_PRIMARY, activebackground=ACCENT, activeforeground="white", font=font(10))
+    
+    color_names = {
+        "#ff5d73": "Red",
+        "#4fa3ff": "Blue",
+        "#38d996": "Green",
+        "#ffcb52": "Yellow"
+    }
+    
+    for color in available_colors:
+        name = color_names.get(color, color)
+        menu.add_command(
+            label=name,
+            command=lambda c=color: set_player_color(index, c)
+        )
+        
+    try:
+        menu.tk_popup(root.winfo_pointerx(), root.winfo_pointery())
+    finally:
+        menu.grab_release()
+
+
+def set_player_color(index, color):
+    color_buttons[index]["value"] = color
+    color_buttons[index]["swatch"].config(bg=color)
 
 
 def build_name_fields(count):
@@ -428,11 +455,13 @@ def animate_slide(player, from_pos, to_pos, on_done, duration=180, steps=10):
 
         if player["token"] is None:
             player["token"] = board_canvas.create_oval(
-                x - 11, y - 11, x + 11, y + 11,
+                x - 11 + offset_x, y - 11 + offset_y,
+                x + 11 + offset_x, y + 11 + offset_y,
                 fill=player["color"], outline="white", width=2
             )
             player["token_text"] = board_canvas.create_text(
-                x, y, text=player["name"][0].upper(), fill="white", font=font(9, "bold")
+                x + offset_x, y + offset_y,
+                text=player["name"][0].upper(), fill="white", font=font(9, "bold")
             )
         else:
             board_canvas.coords(
@@ -555,20 +584,32 @@ def update_position_label(player):
     position_labels[idx].config(text=text)
 
 
-def move_step():
-    try:
-        if player["position"] >= target_position:
+def animate_token_path(player, target_position, on_finished):
+    current_pos = player["position"]
+    path = []
+    if current_pos == 0:
+        for pos in range(1, target_position + 1):
+            path.append(pos)
+    else:
+        for pos in range(current_pos + 1, target_position + 1):
+            path.append(pos)
+
+    def move_next_step(index=0):
+        if index >= len(path):
+            player["position"] = target_position
             on_finished()
             return
-        start = player["position"]
-        end = start + 1
-        player["position"] = end
+        
+        from_pos = player["position"]
+        to_pos = path[index]
+        
+        player["position"] = to_pos
         update_position_label(player)
-        animate_slide(player, start, end, move_step, duration=140, steps=6)
-    except Exception as e:
-        import traceback; traceback.print_exc()
+        
+        slide_from = 1 if from_pos == 0 else from_pos
+        animate_slide(player, slide_from, to_pos, lambda: move_next_step(index + 1), duration=140, steps=6)
 
-    move_step()
+    move_next_step()
 
 
 def finish_move(player):
@@ -619,7 +660,10 @@ def roll_dice():
             current_player_advance()
             return
 
-        new_position = current_position + dice_value
+        if current_position == 0:
+            new_position = 1
+        else:
+            new_position = current_position + dice_value
 
         if new_position > 100:
             dice_label.config(text=f"{player['name']} rolled {dice_value} — overshoots 100!")
