@@ -40,6 +40,7 @@ root.configure(bg=BG_DARK)
 root.resizable(False, False)
 
 players = []
+winners = []
 position_labels = []
 name_entries = []
 color_buttons = []
@@ -68,8 +69,8 @@ def make_button(parent, text, command, bg=ACCENT, fg="white", width=18, pady=12,
         font=font(font_size, "bold"), width=width, pady=pady,
         cursor="hand2"
     )
-    btn.bind("<Button-1>", lambda e: command())
-    btn.bind("<Enter>", lambda e: btn.config(bg=_lighten(bg)))
+    btn.bind("<Button-1>", lambda e: command() if btn.cget("state") != tk.DISABLED else None)
+    btn.bind("<Enter>", lambda e: btn.config(bg=_lighten(bg)) if btn.cget("state") != tk.DISABLED else None)
     btn.bind("<Leave>", lambda e: btn.config(bg=bg))
     return btn
 
@@ -91,6 +92,8 @@ start_frame.pack(expand=True, fill="both")
 name_frame = tk.Frame(root, bg=BG_DARK)
 
 game_frame = tk.Frame(root, bg=BG_DARK)
+
+score_frame = tk.Frame(root, bg=BG_DARK)
 
 
 # ===========================================================
@@ -327,6 +330,7 @@ def get_coordinates(position):
 
 
 def draw_board():
+    board_canvas.delete("all")
     for position in range(1, 101):
         zero_position = position - 1
         row = zero_position // 10
@@ -498,7 +502,7 @@ def animate_dice_roll(final_value, on_done, rolls=10):
 # ===========================================================
 
 def save_players():
-    global players, current_player
+    global players, current_player, winners
 
     for entry in name_entries:
         if not entry.get().strip():
@@ -507,13 +511,15 @@ def save_players():
             return
 
     players = []
+    winners = []
     position_labels.clear()
     current_player = 0
 
     for i, entry in enumerate(name_entries):
         players.append({
             "name": entry.get().strip(),
-            "position": 0,
+            "position": 1,
+            "eligible": False,
             "color": color_buttons[i]["value"],
             "token": None,
             "token_text": None
@@ -531,12 +537,17 @@ def save_players():
         dot.pack(side="left", padx=(0, 8))
 
         label = tk.Label(
-            row, text=f"{player['name']} — Start",
+            row, text="",
             bg=BG_PANEL, fg=TEXT_PRIMARY, font=font(11, "bold"), anchor="w"
         )
         label.pack(side="left", fill="x", expand=True)
 
         position_labels.append(label)
+        update_position_label(player)
+
+    draw_die_face(0)
+    dice_label.config(text="Roll to begin")
+    roll_button.config(state=tk.NORMAL)
 
     current_player_label.config(text=players[0]["name"])
 
@@ -578,7 +589,10 @@ def start_game():
 
 def update_position_label(player):
     idx = players.index(player)
-    text = f"{player['name']} — {'Start' if player['position'] == 0 else player['position']}"
+    if not player.get("eligible", False):
+        text = f"{player['name']} — 1 (Locked)"
+    else:
+        text = f"{player['name']} — {player['position']}"
     if player["position"] == 100:
         text = f"🏆 {player['name']} — WINNER!"
     position_labels[idx].config(text=text)
@@ -587,12 +601,8 @@ def update_position_label(player):
 def animate_token_path(player, target_position, on_finished):
     current_pos = player["position"]
     path = []
-    if current_pos == 0:
-        for pos in range(1, target_position + 1):
-            path.append(pos)
-    else:
-        for pos in range(current_pos + 1, target_position + 1):
-            path.append(pos)
+    for pos in range(current_pos + 1, target_position + 1):
+        path.append(pos)
 
     def move_next_step(index=0):
         if index >= len(path):
@@ -606,26 +616,48 @@ def animate_token_path(player, target_position, on_finished):
         player["position"] = to_pos
         update_position_label(player)
         
-        slide_from = 1 if from_pos == 0 else from_pos
-        animate_slide(player, slide_from, to_pos, lambda: move_next_step(index + 1), duration=140, steps=6)
+        animate_slide(player, from_pos, to_pos, lambda: move_next_step(index + 1), duration=140, steps=6)
 
     move_next_step()
 
 
-def finish_move(player):
+def finish_move(player, rolled_six):
     global current_player
 
     def after_snake_or_ladder():
+        global current_player
         update_position_label(player)
 
         if player["position"] == 100:
-            dice_label.config(text=f"🏆 {player['name']} wins the game!")
-            roll_button.config(state=tk.DISABLED)
+            player["finished"] = True
+            if player not in winners:
+                winners.append(player)
+            
+            # Check if game is over
+            game_over = False
+            if len(players) == 1:
+                game_over = True
+            elif len(winners) == len(players) - 1:
+                # Add the last remaining player as the loser
+                for p in players:
+                    if p not in winners:
+                        winners.append(p)
+                        p["finished"] = True
+                        break
+                game_over = True
+                
+            if game_over:
+                show_scoreboard()
+                return
+
+            current_player_advance()
             return
 
-        current_player = (current_player + 1) % len(players)
-        current_player_label.config(text=players[current_player]["name"])
-        roll_button.config(state=tk.NORMAL)
+        if rolled_six:
+            dice_label.config(text=f"🎲 {player['name']} rolled a 6! Roll again!")
+            roll_button.config(state=tk.NORMAL)
+        else:
+            current_player_advance()
 
     if player["position"] in snakes:
         target = snakes[player["position"]]
@@ -650,36 +682,123 @@ def roll_dice():
 
     player = players[current_player]
     dice_value = random.randint(1, 6)
-    current_position = player["position"]
-
+    
     roll_button.config(state=tk.DISABLED)
 
     def after_roll_animation():
-        if current_position == 0 and dice_value != 6:
-            dice_label.config(text=f"{player['name']} rolled {dice_value} — need a 6 to start!")
-            current_player_advance()
+        global current_player
+        
+        # Check eligibility
+        if not player.get("eligible", False):
+            if dice_value == 6:
+                player["eligible"] = True
+                dice_label.config(text=f"🎲 {player['name']} rolled a 6 and is now eligible to move! Roll again!")
+                update_position_label(player)
+                roll_button.config(state=tk.NORMAL)
+            else:
+                dice_label.config(text=f"{player['name']} rolled {dice_value} — need a 6 to start!")
+                current_player_advance()
             return
-
-        if current_position == 0:
-            new_position = 1
-        else:
-            new_position = current_position + dice_value
+        
+        current_position = player["position"]
+        new_position = current_position + dice_value
 
         if new_position > 100:
             dice_label.config(text=f"{player['name']} rolled {dice_value} — overshoots 100!")
-            current_player_advance()
+            if dice_value == 6:
+                dice_label.config(text=f"{player['name']} rolled 6 (overshoot) — Roll again!")
+                roll_button.config(state=tk.NORMAL)
+            else:
+                current_player_advance()
             return
 
         dice_label.config(text=f"{player['name']} rolled {dice_value}")
-        animate_token_path(player, new_position, lambda: finish_move(player))
+        
+        rolled_six = (dice_value == 6)
+        animate_token_path(player, new_position, lambda: finish_move(player, rolled_six))
 
     animate_dice_roll(dice_value, after_roll_animation)
 
 
 def current_player_advance():
     global current_player
-    current_player = (current_player + 1) % len(players)
-    current_player_label.config(text=players[current_player]["name"])
+    count = 0
+    while count < len(players):
+        current_player = (current_player + 1) % len(players)
+        if not players[current_player].get("finished", False):
+            current_player_label.config(text=players[current_player]["name"])
+            roll_button.config(state=tk.NORMAL)
+            return
+        count += 1
+
+
+def show_scoreboard():
+    game_frame.pack_forget()
+    score_frame.pack(expand=True, fill="both")
+    
+    for widget in score_frame.winfo_children():
+        widget.destroy()
+        
+    score_card = tk.Frame(score_frame, bg=BG_PANEL, padx=50, pady=40)
+    score_card.place(relx=0.5, rely=0.5, anchor="center")
+    
+    tk.Label(
+        score_card, text="🏆  GAME OVER  🏆",
+        bg=BG_PANEL, fg=GOLD, font=font(28, "bold")
+    ).pack(pady=(0, 10))
+    
+    tk.Label(
+        score_card, text="Final Standings:",
+        bg=BG_PANEL, fg=TEXT_MUTED, font=font(13)
+    ).pack(pady=(0, 25))
+    
+    standing_titles = []
+    num_players = len(players)
+    
+    if num_players == 1:
+        standing_titles = ["Winner"]
+    elif num_players == 2:
+        standing_titles = ["Winner", "Loser"]
+    elif num_players == 3:
+        standing_titles = ["Winner", "1st Runner Up", "Loser"]
+    elif num_players == 4:
+        standing_titles = ["Winner", "1st Runner Up", "2nd Runner Up", "Loser"]
+        
+    emojis = ["👑", "🥈", "🥉", "🎗️"]
+    
+    for i, player in enumerate(winners):
+        title = standing_titles[i] if i < len(standing_titles) else "Participant"
+        emoji = emojis[i] if i < len(emojis) else "👤"
+        
+        row = tk.Frame(score_card, bg=BG_CARD, padx=20, pady=12, width=400)
+        row.pack(fill="x", pady=6)
+        
+        dot = tk.Canvas(row, width=14, height=14, bg=BG_CARD, highlightthickness=0)
+        dot.create_oval(2, 2, 12, 12, fill=player["color"], outline="")
+        dot.pack(side="left", padx=(0, 15))
+        
+        tk.Label(
+            row, text=f"{emoji}  {player['name']}",
+            bg=BG_CARD, fg=TEXT_PRIMARY, font=font(14, "bold"), anchor="w"
+        ).pack(side="left")
+        
+        tk.Label(
+            row, text=title,
+            bg=BG_CARD, fg=GOLD if i == 0 else TEXT_MUTED, font=font(12, "italic"), anchor="e"
+        ).pack(side="right", fill="x", expand=True)
+
+    make_button(
+        score_card, "Play Again", play_again,
+        bg=ACCENT, fg="white", width=18, pady=12, font_size=12
+    ).pack(pady=(30, 0))
+
+
+def play_again():
+    score_frame.pack_forget()
+    board_canvas.delete("all")
+    players_entry.delete(0, tk.END)
+    start_error_label.config(text="")
+    start_frame.pack(expand=True, fill="both")
     roll_button.config(state=tk.NORMAL)
 
 
